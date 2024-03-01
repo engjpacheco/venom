@@ -1,0 +1,66 @@
+#!/bin/sh
+#
+# Venom Linux bootstraping script to install from a rootfs
+#
+# License: GPLv3
+
+die() {
+printf "ERROR : $@"
+exit 1
+}
+
+msg() {
+    printf "%s\n" "$@"
+}
+
+# ensure run as root
+[ "$(id -u)" = "0" ] || die "Must run this as root."
+
+
+# download rootfs
+INIT="$1"
+[ -z $INIT ] && INIT=sysv
+
+file="venomlinux-rootfs-$INIT-x86_64.tar.xz"
+sfile="venomlinux-rootfs-$INIT-x86_64.tar.xz.sha512sum"
+if [ ! -f $file ] 
+    then
+	case "$INIT" in 
+	    sysv) url="https://nc.abetech.es/index.php/s/9c6TbRg6xryA8yY/download/$file" 
+	    	  sha="https://nc.abetech.es/index.php/s/CPBw2WjkD9MfHaD/download/$sfile" ;;
+	    s6) url="https://nc.abetech.es/index.php/s/Qt8nRLPtgeK8r5e/download/$file" 
+	     	sha="https://nc.abetech.es/index.php/s/nYRRfaS8ozc9fXd/download/$sfile" ;;
+     -h|--help) die "Usage : $0 init rootfs. If there is no init provided it'll choose sysv."
+	esac
+	msg "Fetching rootfs $INIT tarball : $url"
+	curl -L --fail --ftp-pasv --retry 3 --retry-delay 3 -o ${file}.part $url
+	if [ "$?" = 0 ] ; then
+		rm -f $file
+		mv ${file}.part $file
+	else
+		die "Error fetching rootfs $INIT tarball"
+	fi
+
+	curl -L --fail --ftp-pasv --retry 3 --retry-delay 3 -o $sfile $sha
+	sha512sum $file | awk '{print $1}' > ${file}.checksum
+	sed -i -r 's/(\s+)?\S+//2' $sfile
+	diff $sfile ${file}.checksum || die "Checksum error, fetch de tarball again"
+	# cleanup
+	rm -r ${file}.checksum
+fi
+
+# setting root mountpoint and check if it exist
+root_dir="$2"
+[ -d "$root_dir" ] || die "Install directory do not exist "
+
+# install rootfs to $root_dir
+ bsdtar -xvJpf $file -C $root_dir
+
+ msg "Tarball installed in $root_dir"
+ sleep 2
+
+# chrooting into the system
+msg "Getting into $root_dir to finish the installation...."
+xchroot $root_dir /bin/bash
+
+

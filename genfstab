@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# Prompt for device names
+read -p "Enter boot partition device name (e.g., /dev/sda1): " boot_device
+read -p "Enter root partition device name (e.g., /dev/sda2): " root_device
+read -p "Enter swap partition device name (e.g., /dev/sda3): " swap_device
+
+# Get UUIDs of partitions
+boot_uuid=$(blkid -s UUID -o value $boot_device)
+root_uuid=$(blkid -s UUID -o value $root_device)
+swap_uuid=$(blkid -s UUID -o value $swap_device)
+
+# Generate fstab content
+cat << EOF > /etc/fstab
+# /etc/fstab: static file system information.
+#
+# Use 'blkid' to print the universally unique identifier for a
+# device; this may be used with UUID= as a more robust way to name devices
+# that works even if disks are added and removed. See fstab(5).
+#
+# <file system>             <mount point>  <type>  <options>  <dump>  <pass>
+
+UUID=$boot_uuid     /boot/efi   efi     defaults,noatime,nodiratime         0  2
+UUID=$root_uuid     /           ext4    defaults,noatime,nodiratime         0  1
+UUID=$swap_uuid     swap        swap    defaults                            0  0
+tmpfs               /tmp        tmpfs   defaults,nosuid,nodev,nodiratime    0  0
+EOF
+
+echo "fstab file generated successfully."
